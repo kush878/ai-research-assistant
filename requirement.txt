@@ -6,3 +6,4 @@ pandas
 python-docx
 reportlab
 streamlit-oauth
+PyPDF2
