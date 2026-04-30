@@ -1,9 +1,10 @@
 streamlit
 requests
-faiss-cpu
 numpy
 pandas
-python-docx
-reportlab
-streamlit-oauth
+faiss-cpu
+python-dotenv
 PyPDF2
+sentence-transformers
+scikit-learn
+torch
