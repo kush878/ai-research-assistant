@@ -1,0 +1,8 @@
+streamlit
+requests
+faiss-cpu
+numpy
+pandas
+python-docx
+reportlab
+streamlit-oauth
