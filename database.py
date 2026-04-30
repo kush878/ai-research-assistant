@@ -1,16 +1,31 @@
 import sqlite3
 
+
+DB_PATH = "users.db"
+
+
+def _add_column_if_missing(cursor, table, column, definition):
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = {row[1] for row in cursor.fetchall()}
+
+    if column not in columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
             email TEXT UNIQUE,
             password TEXT
         )
     """)
+
+    _add_column_if_missing(c, "users", "username", "TEXT")
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS chats (
@@ -25,10 +40,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-import sqlite3
-
 def save_chat(user_email, chat_name, messages):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("""
@@ -73,7 +86,7 @@ def save_chat(user_email, chat_name, messages):
 
 
 def load_chats(user_email):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("""
@@ -89,7 +102,7 @@ def load_chats(user_email):
     return rows
 
 def delete_chat(user_email, chat_name):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute(
@@ -101,7 +114,7 @@ def delete_chat(user_email, chat_name):
     conn.close()
     
 def rename_chat(user_email, old_name, new_name):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute(

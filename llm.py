@@ -9,6 +9,9 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("API_KEY")
 
 def get_answer(context, question, chat_history=None):
+    if not GROQ_API_KEY:
+        return "Groq API key is missing. Add API_KEY to your .env file and restart the app."
+
     url = "https://api.groq.com/openai/v1/chat/completions"
 
     headers = {
@@ -54,7 +57,12 @@ def get_answer(context, question, chat_history=None):
                 time.sleep(4 * (attempt + 1))
                 continue
 
-            return f"API Error {response.status_code}"
+            try:
+                detail = response.json().get("error", {}).get("message", response.text)
+            except ValueError:
+                detail = response.text
+
+            return f"API Error {response.status_code}: {detail[:200]}"
 
         except Exception:
             time.sleep(2)

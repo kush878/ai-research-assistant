@@ -10,7 +10,10 @@ from io import BytesIO
 from docx import Document
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from streamlit_oauth import OAuth2Component
+try:
+    from streamlit_oauth import OAuth2Component
+except ImportError:
+    OAuth2Component = None
 import os
 import sqlite3
 import hashlib
@@ -18,6 +21,9 @@ import json
 from database import init_db, save_chat, load_chats, delete_chat, rename_chat
 
 def sync_current_chat():
+    if not st.session_state.user_email and not st.session_state.guest_mode:
+        return
+
     save_chat(
         st.session_state.user_email,
         st.session_state.current_chat,
@@ -34,6 +40,19 @@ import os
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
+
+class _UnavailableOAuth2Component:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def authorize_button(self, *args, **kwargs):
+        st.caption("Google login is unavailable until OAuth credentials and streamlit-oauth are configured.")
+        return None
+
+
+if OAuth2Component is None or not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    OAuth2Component = _UnavailableOAuth2Component
 
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -75,7 +94,7 @@ def register_user(username, email, password):
         conn.commit()
         conn.close()
         return True
-    except:
+    except sqlite3.IntegrityError:
         conn.close()
         return False
 
@@ -656,11 +675,16 @@ with left:
                             for pdf_name in pdf_files:
                                 pdf_path = os.path.join(chat_folder, pdf_name)
                                 with open(pdf_path, "rb") as f:
-                                    index, chunks = process_pdf(f)
-                                    all_chunks.extend(chunks)
-                                    embeddings = get_embeddings(all_chunks)
-                                    st.session_state.index = create_faiss_index(embeddings)
-                                    st.session_state.chunks = all_chunks
+                                    try:
+                                        _, chunks = process_pdf(f)
+                                        all_chunks.extend(chunks)
+                                    except ValueError:
+                                        continue
+
+                            if all_chunks:
+                                embeddings = get_embeddings(all_chunks)
+                                st.session_state.index = create_faiss_index(embeddings)
+                                st.session_state.chunks = all_chunks
                     st.session_state.chat_sessions[chat_name] = loaded_msgs
                     st.session_state.relevant_chunks = []
                     st.session_state.summary_text = ""
@@ -809,17 +833,25 @@ with right:
 
         with st.spinner("Processing PDFs..."):
             for file in uploaded_files:
-                index, chunks = process_pdf(file)
-                all_chunks.extend(chunks)
+                try:
+                    _, chunks = process_pdf(file)
+                    all_chunks.extend(chunks)
+                except ValueError as exc:
+                    st.warning(f"{file.name}: {exc}")
 
-            embeddings = get_embeddings(all_chunks)
-            st.session_state.index = create_faiss_index(embeddings)
-            st.session_state.chunks = all_chunks
-            save_chat(
-                st.session_state.user_email,
-                st.session_state.current_chat,
-                json.dumps(st.session_state.messages)
-                )
+            if all_chunks:
+                embeddings = get_embeddings(all_chunks)
+                st.session_state.index = create_faiss_index(embeddings)
+                st.session_state.chunks = all_chunks
+                save_chat(
+                    st.session_state.user_email,
+                    st.session_state.current_chat,
+                    json.dumps(st.session_state.messages)
+                    )
+            else:
+                st.session_state.index = None
+                st.session_state.chunks = None
+                st.error("No readable text was found in the uploaded PDF files.")
 
     c1, c2 = st.columns(2)
 
@@ -918,7 +950,11 @@ with right:
                 st.session_state.index,
                 st.session_state.chunks
             )
-            context = relevant_chunks[0][:900]
+            if not relevant_chunks:
+                st.warning("No relevant PDF context found for this question.")
+                st.stop()
+
+            context = " ".join(relevant_chunks[:3])[:2500]
             answer = get_answer(context, user_input)
             
             #important (save time for cooldown)
