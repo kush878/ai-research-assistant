@@ -5,6 +5,4 @@ pandas
 faiss-cpu
 python-dotenv
 PyPDF2
-sentence-transformers
 scikit-learn
-torch

@@ -1,6 +1,10 @@
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+vectorizer = TfidfVectorizer()
 
+def get_embeddings(texts):
+    return vectorizer.fit_transform(texts).toarray()
+
+model = None
 def get_embeddings(text_chunks):
     return model.encode(text_chunks)
